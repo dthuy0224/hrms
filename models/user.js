@@ -1,9 +1,10 @@
-var mongoose = require("mongoose");
-var bcrypt = require("bcrypt-nodejs");
+const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
 require("mongoose-type-email");
-var Schema = mongoose.Schema;
 
-var UserSchema = new Schema({
+const Schema = mongoose.Schema;
+
+const UserSchema = new Schema({
   type: { type: String },
   email: { type: mongoose.SchemaTypes.Email, required: true, unique: true },
   password: { type: String, required: true },
@@ -13,14 +14,26 @@ var UserSchema = new Schema({
   department: String,
   Skills: [String],
   designation: String,
-  dateAdded: { type: Date },
+  dateAdded: { type: Date, default: Date.now },
 });
 
-UserSchema.methods.encryptPassword = function (password) {
-  return bcrypt.hashSync(password, bcrypt.genSaltSync(5), null);
+// Mã hóa mật khẩu trước khi lưu vào database
+UserSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Hàm kiểm tra mật khẩu
+UserSchema.methods.validPassword = async function (password) {
+  return await bcrypt.compare(password, this.password);
 };
 
-UserSchema.methods.validPassword = function (password) {
-  return bcrypt.compareSync(password, this.password);
-};
+// Xuất model User
 module.exports = mongoose.model("User", UserSchema);

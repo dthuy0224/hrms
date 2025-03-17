@@ -21,7 +21,7 @@
 #cssmenu.align-right ul li {
   float: right;
   border-right: 0;
-  border-left: 1px solid rgba(0, 0, 0, 0.22);
+  border-left: 1px solid rgba(241, 22, 22, 0.22);
 }
 #cssmenu.align-right ul li a {
   border-right: 0;
@@ -81,7 +81,7 @@
 }
 #cssmenu ul li:hover,
 #cssmenu ul li.active {
-  background: #1275ae;
+  background: #004687;
   /* Old browsers */
 
   background: -moz-linear-gradient(bottom, #0b4669 0%, #1275ae 50%, #1794dc 51%, #1691d8 78%, #98d2f4 100%);

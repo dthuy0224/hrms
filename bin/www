@@ -10,6 +10,7 @@
 const db = require("../db");
 
 let server;
+let port;
 
 db.connect()
   .then(() => {
@@ -20,13 +21,13 @@ db.connect()
     /**
      * Get port from environment and store in Express.
      */
-    const port = normalizePort(process.env.PORT || "3000");
+     port = normalizePort(process.env.PORT || "3000");
     /**
      * Create HTTP server.
      */
     server = http.createServer(app);
     server.listen(port);
-    server.on("error", onError);
+    server.on("error", (error) => onError(error, port));
     server.on("listening", onListening);
     app.set("port", port);
   })
@@ -65,9 +66,10 @@ function onError(error) {
     throw error;
   }
 
+  const port = process.env.PORT || "3000"; // Định nghĩa lại biến port
+
   let bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
 
-  // handle specific listen errors with friendly messages
   switch (error.code) {
     case "EACCES":
       console.error(bind + " requires elevated privileges");
@@ -81,6 +83,7 @@ function onError(error) {
       throw error;
   }
 }
+
 
 /**
  * Event listener for HTTP server "listening" event.

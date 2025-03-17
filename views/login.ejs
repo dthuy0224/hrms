@@ -1,36 +1,74 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <title>
-    <%= title %>
-  </title>
+  <meta name="csrf-token" content="<%= csrfToken %>">
+  <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/normalize.css" />
   <link rel="stylesheet" href="/stylesheets/login.css" />
 </head>
-
 <body>
-  <div class="login">
-    <h1>HRMS</h1>
-    <% if(hasErrors) { %>
-      <div style="background-color: red; color: white; padding: 5px; margin-bottom: 20px;">
-        <% messages.forEach(function(item) { %>
-          <p id="message">
-            <%= item %>
-          </p>
-          <% }) %>
+  <div class="login-container">
+    <h1>HRIS</h1>
+
+    <% if (hasErrors) { %>
+      <div class="error-message">
+        <% messages.forEach(function (item) { %>
+          <p><%= item %></p>
+        <% }) %>
       </div>
-      <% } %>
-        <form action="/login" method="post">
-          <input type="text" id="email" name="email" placeholder="Enter Email Address" required="required" />
-          <input type="password" id="password" name="password" placeholder="Enter Password" required="required" />
-          <input type="hidden" name="_csrf" value="<%=csrfToken%>" />
-          <button type="submit" id="login" class="btn btn-primary btn-block btn-large">
-            Login
-          </button>
-        </form>
+    <% } %>
+
+    <form id="loginForm" action="/login" method="POST">
+      <input type="hidden" id="csrfToken" name="_csrf" value="<%= csrfToken %>">
+      
+      <div class="input-group">
+        <label for="email">Email:</label>
+        <input type="text" id="email" name="email" placeholder="Enter Email Address" required>
+      </div>
+    
+      <div class="input-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" placeholder="Enter Password" required>
+      </div>
+    
+      <p class="forgot-password"><a href="/forgot-password">Forgot your password?</a></p>
+    
+      <button type="submit" class="btn-login">Log In</button>
+    </form>
+    
+
+    <p class="help-link">Need help? Visit our <a href="#">help center</a></p>
   </div>
 </body>
+
 <script src="/javascripts/prefixfree.min.js"></script>
+<script>
+document.getElementById("loginForm").addEventListener("submit", async function (event) {
+  event.preventDefault(); // Ngăn chặn submit mặc định
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');  
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const response = await fetch("/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRF-Token": csrfToken,  
+    },
+    credentials: "include",  
+    body: new URLSearchParams({ email, password, _csrf: csrfToken })
+  });
+
+  if (response.ok) {
+    window.location.href = "/dashboard";  
+  } else {
+    alert("Login failed!");
+  }
+});
+
+
+</script>
+
 
 </html>

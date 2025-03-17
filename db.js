@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
 require("dotenv").config();
 
-mongoose.Promise = global.Promise;
-
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("DB_URL:", process.env.DB_URL);
+console.log("DB_URL_TEST:", process.env.DB_URL_TEST);
 mongoose.Promise = global.Promise;
 
 const connect = (opts = {}) => {

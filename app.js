@@ -1,11 +1,3 @@
-/**
- * This script sets up the Express application. It imports necessary modules, sets up middleware,
- * connects to the database, and imports routes.
- *
- * The Express application is then exported and can be used by other scripts (like www).
- *
- */
-
 const express = require("express");
 const path = require("path");
 const logger = require("morgan");
@@ -16,102 +8,130 @@ const passport = require("passport");
 const flash = require("connect-flash");
 const MongoStore = require("connect-mongo");
 const favicon = require("serve-favicon");
+const csrf = require("csurf");
+const helmet = require("helmet");
+const compression = require("compression");
+const Boom = require("@hapi/boom");
+require("dotenv").config();
 
-const index = require("./routes/index");
-const admin = require("./routes/admin");
-const employee = require("./routes/employee");
-const manager = require("./routes/manager");
-const db = require("./db");
-
-expressValidator = require("express-validator");
-
-// Import the Passport configuration.
-// This module configures Passport's strategies and sets up serialization and deserialization rules.
-require("./config/passport.js");
-
+// ⚠️ Khởi tạo ứng dụng Express
 const app = express();
 
-// view engine setup
+// 🛠 Kết nối MongoDB
+const mongoose = require("mongoose");
+const MONGO_URL = process.env.DB_URL || "mongodb://localhost:27017/HRMS";
+
+async function connectDB() {
+  try {
+    await mongoose.connect(MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true });
+    console.log("✅ MongoDB Connected");
+  } catch (err) {
+    console.error("❌ Database connection error:", err);
+    process.exit(1);
+  }
+}
+connectDB();
+
+// ✅ Bảo mật HTTP Headers
+app.use(helmet());
+
+// ✅ Cải thiện hiệu suất bằng compression
+app.use(compression());
+
+// Cấu hình view engine
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
+// Middleware
 app.use(favicon(path.join(__dirname, "public", "images", "favicon.ico")));
-
-// Use the morgan middleware for logging HTTP requests.
-// 'dev' format is used, which means the log will include method, url, status, response time and content length.
 app.use(logger("dev"));
-
-//json() function parses incoming requests with JSON payloads.
 app.use(bodyParser.json());
-// urlencoded() function parses incoming requests with URL-encoded payloads.
 app.use(bodyParser.urlencoded({ extended: false }));
-// express-validator middleware validates and sanitize request data.
-//validator should be after body parser
-app.use(expressValidator());
-// parses Cookie header and populate req.cookies with an object keyed by the cookie names.
 app.use(cookieParser());
-
 app.use(express.static(path.join(__dirname, "public")));
 
-// Use the express-session middleware to handle session state.
-// The 'secret' is used to sign the session ID cookie.
-// 'resave: false' means the session store will not be resaved into the session store if it hasn't changed.
-// 'saveUninitialized: false' means the session will not be stored in the session store if it's new and not modified.
-// 'store' is used to configure the session store. Here, a new instance of MongoStore is created to store session state in MongoDB.
-// 'mongooseConnection: mongoose.connection' tells MongoStore to use the existing Mongoose connection.
-// 'cookie: { maxAge: 180 * 60 * 1000 }' sets the maximum age of the session cookie to 180 minutes.
+// 🛠 Cấu hình session với MongoStore
 app.use(
   session({
-    secret: "mysupersecret",
+    secret: process.env.SESSION_SECRET || "mysupersecret",
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-      client: db.getConnection().getClient(),
+      mongoUrl: MONGO_URL,
+      collectionName: "sessions",
     }),
     cookie: { maxAge: 180 * 60 * 1000 },
   })
 );
 
-// connect-flash middleware provides flash messages, which are stored in the session until they are displayed and deleted.
-// Flash messages are often used to show one-time notifications to the user.
-app.use(flash());
-// This is required to set up Passport's persistent login sessions.
-// It must be used before any routes that need to authenticate users.
+// Cấu hình Passport
+require("./config/passport");
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(flash());
 
-// Set up routing for the application.
-// The first argument to app.use() is the base path for the routes defined in the provided router.
-// The second argument is the router object.
-// For example, app.use("/admin", admin) means that the routes defined in the 'admin' router will be used for any path that starts with '/admin'.
-app.use("/", index);
-app.use("/admin", admin);
-app.use("/manager", manager);
-app.use("/employee", employee);
+// ✅ Cấu hình CSRF Protection
+const csrfProtection = csrf();
+app.use(cookieParser());
+app.use(csrfProtection);
 
-app.use(function (req, res, next) {
+// ✅ Gán CSRF token vào res.locals
+app.use((req, res, next) => {
+  res.locals.csrfToken = req.csrfToken();
+  res.cookie("XSRF-TOKEN", req.csrfToken(), { httpOnly: true, secure: false }); 
+  next();
+});
+
+// Middleware chung
+app.use((req, res, next) => {
+  res.locals.title = "HRMS System";
   res.locals.login = req.isAuthenticated();
   res.locals.session = req.session;
   res.locals.messages = req.flash();
   next();
 });
 
-// catch 404 and forward to error handler
-app.use(function (req, res, next) {
-  const err = new Error("Not Found");
-  err.status = 404;
-  next(err);
+// Load routes
+const index = require("./routes/index");
+const admin = require("./routes/admin");
+const employee = require("./routes/employee");
+const manager = require("./routes/manager");
+const forgotPasswordRoutes = require("./routes/forgotPassword");
+
+// Đăng ký routes
+app.use("/", forgotPasswordRoutes);
+app.use("/", index);
+app.use("/admin", admin);
+app.use("/manager", manager);
+app.use("/employee", employee);
+
+const cors = require("cors");
+
+app.use(cors({
+    origin: "http://localhost:3000",  // Cập nhật đúng domain frontend
+    credentials: true
+}));
+
+
+
+// Middleware xử lý lỗi 404
+app.use((req, res, next) => {
+  next(Boom.notFound("Page Not Found"));
 });
 
-// error handler
-app.use(function (err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
+// Middleware xử lý lỗi chung
+app.use((err, req, res, next) => {
+  console.error("❌ Error:", err);
+  const { statusCode, payload } = err.isBoom ? err.output : { statusCode: 500, payload: { message: "Internal Server Error" } };
+  res.status(statusCode).render("error", { message: payload.message, error: req.app.get("env") === "development" ? err : {} });
+});
 
-  // render the error page
-  res.status(err.status || 500);
-  res.render("error");
+// Debug - In danh sách route đã load
+console.log("✅ Registered routes:");
+app._router.stack.forEach((r) => {
+  if (r.route && r.route.path) {
+    console.log(`📌 ${r.route.stack[0].method.toUpperCase()} ${r.route.path}`);
+  }
 });
 
 module.exports = app;
